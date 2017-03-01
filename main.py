@@ -128,4 +128,3 @@ def show_images(items):
 
 if __name__ == '__main__':
     main()
-    # main_test()
