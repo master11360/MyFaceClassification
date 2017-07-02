@@ -1,24 +1,36 @@
 # -*- coding: utf-8 -*-
 import cv2
 import json
-import os
 from sklearn import svm
-from sklearn import metrics
 import numpy as np
 from item import Item
-import matplotlib.pyplot as plt
+from constant import *
+from skimage import feature
 
-DEBUG = True
-DEBUG_TRAINING_IMG = False
-DEBUG_TARGET_IMG = False
-KEY_TRAINING_PATH = 'training_path'
-KEY_TARGET_PATH = 'target_path'
-VALID_IMG_TYPE = ('.jpg', '.jpeg', '.png')
-NORMALIZED_SIZE = (128, 128)
+
+class LocalBinaryPatterns:
+    def __init__(self, num_points, radius):
+        # store the number of points and radius
+        self.num_points = num_points
+        self.radius = radius
+
+    def describe(self, image, eps=1e-7):
+        # compute the Local Binary Pattern representation
+        # of the image, and then use the LBP representation
+        # to build the histogram of patterns
+        lbp = feature.local_binary_pattern(image, self.num_points, self.radius, method="uniform")
+        (hist, _) = np.histogram(lbp.ravel(), bins=np.arange(0, self.num_points + 3), range=(0, self.num_points + 2))
+
+        # normalize the histogram
+        hist = hist.astype("float")
+        hist /= (hist.sum() + eps)
+
+        # return the histogram of Local Binary Patterns
+        return hist
 
 
 def main():
-    config_json = load_json_file('config.json')
+    config_json = load_json_file(PATH_JSON_CONFIG)
     if not is_valid_config_file(config_json):
         return
 
@@ -49,20 +61,43 @@ def main():
     if DEBUG_TARGET_IMG:
         show_images(target_items)
 
+    desc = LocalBinaryPatterns(24, 8)
+    # for training data
+    for item in training_items:
+        gray = cv2.cvtColor(item.normalized_img, cv2.COLOR_BGR2GRAY)
+        hist = desc.describe(gray)
+        item.lbp_histogram = hist
+
+    # for target data
+    for item in target_items:
+        gray = cv2.cvtColor(item.normalized_img, cv2.COLOR_BGR2GRAY)
+        hist = desc.describe(gray)
+        item.lbp_histogram = hist
+
     # Create a classifier: a support vector classifier
     classifier = svm.SVC(gamma=0.001)
-    training_imgs = [np.array(item.normalized_img).flatten().tolist() for item in training_items]
+    training_imgs = [item.lbp_histogram for item in training_items]
     training_class_num = [item.class_num for item in training_items]
     classifier.fit(training_imgs, training_class_num)
 
     # Now predict the value of the digit on the second half:
-    target_imgs = [np.array(item.normalized_img).flatten().tolist() for item in target_items]
+    target_imgs = [item.lbp_histogram for item in target_items]
     target_class_num = [item.class_num for item in target_items]
     predicted = classifier.predict(target_imgs)
 
-    print("Classification report for classifier %s:\n%s\n"
-          % (classifier, metrics.classification_report(target_class_num, predicted)))
-    print("Confusion matrix:\n%s" % metrics.confusion_matrix(target_class_num, predicted))
+    items = []
+    print 'target class:', target_class_num
+    print 'predicted result:', predicted
+    for i in range(len(target_class_num)):
+        if target_class_num[i] != predicted[i]:
+            items.append(target_items[i])
+
+    show_images(items)
+
+    # confusion_matrix = metrics.confusion_matrix(target_class_num, predicted)
+    # # print("Classification report for classifier %s:\n%s\n"
+    # #       % (classifier, metrics.classification_report(target_class_num, predicted)))
+    # print("Confusion matrix:\n%s" % confusion_matrix)
 
     # images_and_predictions = list(zip(training_imgs, predicted))
     # for index, (image, prediction) in enumerate(images_and_predictions[:2]):

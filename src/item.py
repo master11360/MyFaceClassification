@@ -6,6 +6,7 @@ class Item:
         self.__file_name = file_name
         self.__file_path = file_path
         self.__normalized_img = None
+        self.__lbp_histogram = None
 
     @property
     def img(self):
@@ -30,6 +31,14 @@ class Item:
     @normalized_img.setter
     def normalized_img(self, normalized_img):
         self.__normalized_img = normalized_img
+
+    @property
+    def lbp_histogram(self):
+        return self.__lbp_histogram
+
+    @lbp_histogram.setter
+    def lbp_histogram(self, lbp_histogram):
+        self.__lbp_histogram = lbp_histogram
 
     def __str__(self):
         return 'file_name = ' + self.__file_name + ', class_num = ' + str(self.__class_Num) + ', file_path = ' \
